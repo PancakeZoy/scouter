@@ -62,8 +62,10 @@ class model():
               use_batch_norm =True,
               use_layer_norm =False,
               dropout_rate = 0.,
+              loss_gamma=2.0, 
+              loss_lambda_=0.1,
               lr = 0.005,
-              gamma = 0.8,
+              sched_gamma = 0.8,
               n_epochs = 40,
               patience = 5):
         
@@ -84,7 +86,7 @@ class model():
         
         
         optimizer = optim.Adam(network.parameters(), lr=lr)
-        scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
+        scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=sched_gamma)
         
         # Start training with early stopping based on validation sets
         best_val_loss = np.inf
@@ -98,7 +100,7 @@ class model():
             for ctrl_exp, pert_expr, gene_idx, bcode in train_progress:
                 optimizer.zero_grad()
                 output = network(gene_idx, ctrl_exp)
-                loss = gears_loss(output, pert_expr, ctrl_exp, gene_idx)
+                loss = gears_loss(output, pert_expr, ctrl_exp, gene_idx, gamma=loss_gamma, lambda_=loss_lambda_)
                 loss.backward()
                 nn.utils.clip_grad_norm_(network.parameters(), max_norm=1.0)
                 optimizer.step()
@@ -112,7 +114,7 @@ class model():
             with torch.no_grad():
                 for ctrl_exp, pert_expr, gene_idx, bcode in val_progress:
                     output = network(gene_idx, ctrl_exp)
-                    loss = gears_loss(output, pert_expr, ctrl_exp, gene_idx)
+                    loss = gears_loss(output, pert_expr, ctrl_exp, gene_idx, gamma=loss_gamma, lambda_=loss_lambda_)
                     val_loss += loss.item()
             val_loss /= len(val_loader)
     
@@ -156,16 +158,17 @@ class model():
         pred_adata.X = prediction
         
         # Loss
-        test_loss = gears_loss(prediction, pert_expr, ctrl_exp, gene_idx).item()
+        # test_loss = gears_loss(prediction, pert_expr, ctrl_exp, gene_idx, gamma=loss_gamma, lambda_=loss_lambda_).item()
 
-        return pred_adata, test_loss
+        # return pred_adata, test_loss
+        return pred_adata
     
     def barplot(self, gene_name, pred_adata, true_adata):
         def process_key(key):
             key = key.split('_', 1)[-1]
             key = key.split('+ctrl')[0]
             return key
-        topGene_dic = true_adata.uns['top_non_dropout_de_20']    
+        topGene_dic = true_adata.uns['top_non_dropout_de_20']
         processed_dic = {process_key(key): value for key, value in topGene_dic.items()}
         degs = processed_dic[gene_name]
         degs_namedict = (true_adata.var.to_dict())[self.key_var_genename]
@@ -175,7 +178,7 @@ class model():
         g_ctrl = true_adata[true_adata.obs[self.key_label]=='ctrl', degs].X.toarray()
         
         # Create a DataFrame for each ndarray
-        degs_name = [f'{degs_namedict[degs[i]]}' for i in range(g_pred.shape[1])]        
+        degs_name = [f'{degs_namedict[degs[i]]}' for i in range(g_pred.shape[1])]
         df_pred = pd.DataFrame(g_pred, columns=degs_name)
         df_true = pd.DataFrame(g_true, columns=degs_name)
         df_ctrl = pd.DataFrame(g_ctrl, columns=degs_name)
