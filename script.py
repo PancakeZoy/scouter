@@ -1,41 +1,62 @@
 import pickle
+import torch
 import anndata as ad
 import pandas as pd
+import numpy as np
 from _utils import *
+import random
 from api import model
 
-data_path = '/Users/pancake/Downloads/PerturbGPT/PerturbData/dixit/perturb_processed.h5ad'
+# Function to set seeds
+def set_seeds(seed=42):
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+# Set seeds for reproducibility
+set_seeds(42)
+
+data_path = '/Users/pancake/Downloads/PerturbGPT/PerturbData/adamson/perturb_processed.h5ad'
 embd_path = '/Users/pancake/Downloads/PerturbGPT/PerturbData/GeneEmb/GenePT_emb/GenePT_gene_embedding_ada_text.pickle'
 
+# Load the processed scRNA-seq dataset as Anndata
 adata = ad.read_h5ad(data_path)
-adata.obs['condition'] = adata.obs['condition'].str.replace(r'\+ctrl$', '', regex=True)
+# Load the gene embedding as the dataframe, and rename its gene alias to match the Anndata
 with open(embd_path, 'rb') as f:
     embd = pd.DataFrame(pickle.load(f)).T
+ctrl_row = pd.DataFrame([np.zeros(embd.shape[1])], columns=embd.columns, index=['ctrl'])
+embd = pd.concat([ctrl_row, embd])
+embd.rename(index={'MAP3K21': 'KIAA1804', 'RHOXF2B': 'RHOXF2BB'}, inplace=True)
+# Setup anndata to meet the format requirement of model
 adata, embd, matched_genes = setup_ad(adata, embd, 'condition', 'gene_name', 'embd_index')
+# Split the dataset into train (train+val) and test
+all_conds = np.setdiff1d(adata.obs['condition'].unique().tolist(), 'ctrl').tolist()
+np.random.shuffle(all_conds)
+subsets = np.split(all_conds, range(4, len(all_conds), 4))
+subsets
 
-
-train_adata, test_adata = split_TrainVal(adata, key_label='condition', val_conds_include=None, val_ratio=0.1)
-
-mymodel = model(adata = train_adata, 
-                embd = embd, 
-                key_label='condition',
-                key_embd_index = 'embd_index',
-                key_var_genename = 'gene_name')
-
-mymodel.train(val_ratio=0.1, n_epochs=4)
-
-# pred_adata, test_loss = mymodel.pred(test_adata)
-pred_adata = mymodel.pred(test_adata)
-ensembl_dict = pred_adata.var.to_dict()['gene_name']
-
-list(ensembl_dict.keys())[list(ensembl_dict.values()).index('CHAC1')]
-
-test_adata.obs.condition.unique()
-mymodel.barplot('TOR1AIP1', pred_adata=pred_adata, true_adata=test_adata)
-
-
-pred_adata[pred_adata.obs.condition=='ELK1', ['ENSG00000112306']].X.toarray().mean()
-test_adata[test_adata.obs.condition=='ELK1', ['ENSG00000112306']].X.toarray().mean()
-train_adata[train_adata.obs.condition=='ctrl', ['ENSG00000112306']].X.toarray().mean()
-
-pred_adata.var[pred_adata.var.gene_name == 'PSMD4']
+i = 0
+metric_list = []
+for ss in subsets[10:]:
+    i += 1
+    print(f'{i+1}/{len(subsets[10:])}')
+    train_adata, test_adata = split_TrainVal(adata, key_label='condition', val_conds_include=ss)
+    # Initialize the model
+    mymodel = model(adata = train_adata, 
+                    embd = embd, 
+                    key_label='condition',
+                    key_embd_index = 'embd_index',
+                    key_var_genename = 'gene_name')
+    # Train the model
+    mymodel.train(val_ratio=0., n_epochs=4)
+    # Predict on test data
+    pred_adata = mymodel.pred(test_adata)
+    # Make barplot of a given gene
+    # mymodel.barplot('K562(?)_EIF2B3+ctrl_1+1', pred_adata=pred_adata, true_adata=test_adata)
+    # Calculate the metric
+    metric_df = mymodel.evaluate(pred_adata=pred_adata, true_adata=test_adata)
+    metric_list.append(metric_df)
+    
+metric_df = pd.concat(metric_list)
+metric_df.to_csv('Result/metric_adamson.csv')

@@ -4,13 +4,13 @@ import anndata as ad
 import pandas as pd
 import scanpy as sc
 
-def gears_loss(predicted, true, control, group, gamma=2.0, lambda_=0.1):
+def gears_loss(predicted, true, control, group, gamma, lambda_):
     def group_mean(expr, group):
-        unique_ids, inverse_indices = torch.unique(group, return_inverse=True)
+        unique_ids, inverse_indices = torch.unique(group, return_inverse=True, dim=0)
         num_groups = unique_ids.size(0)
         group_sums = torch.zeros(num_groups)
         group_sums.index_add_(0, inverse_indices, expr)
-        group_counts = torch.zeros(num_groups).long().index_add_(0, inverse_indices, torch.ones_like(group))
+        group_counts = torch.zeros(num_groups).index_add_(0, inverse_indices, torch.ones(group.shape[0]))
         group_means = group_sums / group_counts
         return group_means
 
@@ -35,23 +35,44 @@ def split_TrainValTest(adata, key_label, test_conds_include=None, val_test_ratio
     return train_adata, val_adata, test_adata
 
 
-def split_TrainVal(adata, key_label, val_conds_include=None, val_ratio=0.2):
+# def split_TrainVal(adata, key_label, val_conds_include=None, val_ratio=0.2):
+#     """Splits the data into train, validation based on conditions."""
+#     all_conds = adata[adata.obs[key_label] != 'ctrl'].obs[key_label].unique().tolist()
+#     np.random.shuffle(all_conds)
+#     n_ValNeed = round(val_ratio * len(all_conds))
+#     if val_conds_include is None:
+#         val_conds, train_conds = np.split(all_conds, [n_ValNeed])
+#         train_conds = list(train_conds)+['ctrl']
+#         val_conds = list(val_conds)+['ctrl']
+#     else:
+#         n_given = len(val_conds_include)
+#         if n_given > n_ValNeed:
+#             raise ValueError(f"Number of given validation conditions must be smaller than or equal to {n_ValNeed}.")
+#         rest_of_conds = list(set(all_conds) - set(val_conds_include))
+#         val_conds, train_conds = np.split(rest_of_conds, [(n_ValNeed-n_given)])
+#         train_conds = list(train_conds)+['ctrl']
+#         val_conds = list(val_conds)+val_conds_include+['ctrl']
+
+#     train_mask = adata.obs['condition'].isin(train_conds)
+#     val_mask = adata.obs['condition'].isin(val_conds)
+#     train_adata = adata[train_mask]
+#     val_adata = adata[val_mask]
+
+#     return train_adata, val_adata
+
+def split_TrainVal(adata, key_label, val_conds_include=None, val_ratio=0.2, seed=42):
     """Splits the data into train, validation based on conditions."""
     all_conds = adata[adata.obs[key_label] != 'ctrl'].obs[key_label].unique().tolist()
-    np.random.shuffle(all_conds)
-    n_ValNeed = round(val_ratio * len(all_conds))
-    if val_conds_include is not None:
-        n_given = len(val_conds_include)
-        if n_given > n_ValNeed:
-            raise ValueError(f"Number of given validation conditions must be smaller than or equal to {n_ValNeed}.")
-        rest_of_conds = list(set(all_conds) - set(val_conds_include))
-        val_conds, train_conds = np.split(rest_of_conds, [(n_ValNeed-n_given)])
-        train_conds = list(train_conds)+['ctrl']
-        val_conds = list(val_conds)+val_conds_include+['ctrl']
-    else:
+    if val_conds_include is None:
+        np.random.seed(42)
+        np.random.shuffle(all_conds)
+        n_ValNeed = round(val_ratio * len(all_conds))        
         val_conds, train_conds = np.split(all_conds, [n_ValNeed])
         train_conds = list(train_conds)+['ctrl']
         val_conds = list(val_conds)+['ctrl']
+    else:
+        val_conds = list(val_conds_include)+['ctrl']
+        train_conds = list(np.setdiff1d(all_conds, val_conds))+['ctrl']
         
     train_mask = adata.obs['condition'].isin(train_conds)
     val_mask = adata.obs['condition'].isin(val_conds)
@@ -63,7 +84,7 @@ def split_TrainVal(adata, key_label, val_conds_include=None, val_ratio=0.2):
 
 
 def setup_ad(adata: ad.AnnData, 
-             embd_df: pd.DataFrame, 
+             embd: pd.DataFrame, 
              key_label: str, 
              key_Gname: str, 
              key_embd_index: str):
@@ -78,7 +99,7 @@ def setup_ad(adata: ad.AnnData,
         Annotated data object. adata.obs must contain a column 'key_label' with required format: 
              'ctrl' for control cells, or
              gene names to denote the gene perturbed
-    embd_df : pd.DataFrame
+    embd : pd.DataFrame
         Gene embedding pandas DataFrame, with gene names as row names.
     key_label : str
         Column name in adata.obs that denotes perturbed gene names.
@@ -87,28 +108,38 @@ def setup_ad(adata: ad.AnnData,
     key_embd_index : str
         New column name to be added to adata.obs that will store the index of the perturbed gene in the gene embedding matrix.
     """
-    adata = adata.copy(); embd_df=embd_df.copy()
-    all_perturbs = adata.obs[key_label].unique().tolist()
-    if 'ctrl' not in all_perturbs:
-        raise TypeError("AnnData does not have the required format!")
-    all_perturbs.remove('ctrl')
-        
-    gene_name_ad = adata.var[key_Gname].tolist()
-    gene_name_embd = embd_df.index.tolist()
-    matched_genes = sorted(list(set(gene_name_embd) & set(gene_name_ad)))
-    print(f'{len(matched_genes)} matched genes found between your dataset and gene embedding')
-    embd_mtx = embd_df.loc[matched_genes]
+    adata = adata.copy(); embd=embd.copy()
     
-    unmatched_perturb = [p not in matched_genes for p in all_perturbs]
-    if sum(unmatched_perturb) > 0:
-        print(f'These perturbed genes are not found in the gene embedding matrix: {all_perturbs[unmatched_perturb]}')
+    # Normalize the condition name. Make "A+B" and "B+A" the same
+    adata.obs[key_label] = adata.obs[key_label].astype(str).apply(lambda x: '+'.join(sorted(x.split('+'))))
+    adata.obs[key_label] = adata.obs[key_label].astype('category')
+    # Find the matched genes between embd and adata
+    gene_name_ad = adata.var[key_Gname].tolist()
+    gene_name_embd = embd.index.tolist()
+    matched_genes = ['ctrl'] + sorted(list(set(gene_name_embd) & set(gene_name_ad)))
+    print(f'{len(matched_genes)} matched genes found between your dataset and gene embedding')
+    embd_mtx = embd.loc[matched_genes]
+    # Detect any perturbed genes that are not in matched genes
+    uniq_conds = adata.obs[key_label].unique().tolist()
+    if 'ctrl' not in uniq_conds:
+        raise TypeError("Provided annData does not have control cells")
+    perturb_genes = np.unique(sum([p.split('+') for p in uniq_conds], []))
+    unmatched_genes = perturb_genes[[p not in matched_genes for p in perturb_genes]]
+    if len(unmatched_genes) > 0:
+        print(f'{len(unmatched_genes)} perturbed genes are not found in the gene embedding matrix: {unmatched_genes}. \nHence they are deleted.')
+        # Filter the DataFrame to exclude rows where the condition contains any unmatched genes
+        adata = adata[~adata.obs[key_label].apply(lambda condition: any(gene in condition for gene in unmatched_genes))].copy()
+        uniq_conds = adata.obs[key_label].unique().tolist()
+        perturb_genes = np.unique(sum([p.split('+') for p in uniq_conds], []))
     else:
         print('All perturbed genes are found in the gene embedding matrix!')
-
-    gene_ind_dic = {g: (matched_genes.index(g) if g in matched_genes else len(matched_genes)) for g in all_perturbs}
-    adata.obs[key_embd_index] = adata.obs[key_label].apply(lambda x: gene_ind_dic.get(x, -1))
+    #Create a new column that contains the index of perturbed genes in embd matrix
+    gene_ind_dic = {g: matched_genes.index(g) for g in perturb_genes}
+    cond_ind_dic = {cond:[gene_ind_dic[gene] for gene in cond.split('+')] for cond in uniq_conds}
+    adata.obs[key_embd_index] = adata.obs[key_label].astype(str).map(cond_ind_dic)
     
     return adata, embd_mtx, matched_genes
+
 
 
 def TopKGens(adata, fashion= 'symm',
