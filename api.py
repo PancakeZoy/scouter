@@ -1,4 +1,4 @@
-from _utils import *
+from _utils import split_TrainVal, gears_loss
 from _model import GenePerturbationModel
 from _datasets import BalancedDataset
 import anndata as ad
@@ -21,7 +21,9 @@ class model():
         embd,
         key_label,
         key_embd_index,
-        key_var_genename
+        key_var_genename,
+        key_uns,
+        device = 'auto'
     ):
         """
         Initialize the model.
@@ -33,6 +35,14 @@ class model():
             Annotated data object.
         - embd: 
             Gene embedding pandas dataframe, where gene names as rownames .
+        - key_label:
+            The column name of 'adata.obs' that contains the perturbation condition
+        -key_embd_index:
+            The column name of 'adata.obs' that contains the index of perturbed genes in the gene embedding matrix
+        -key_var_genename:
+            The column name of 'adata.var' that contains the gene names corresponding to that in gene embedding matrix
+        -key_uns:
+            The column name of 'adata.obs' that contains the key names of 'adata.uns'
         """
         if not isinstance(adata, ad.AnnData):
             raise TypeError("adata must be an AnnData object")
@@ -45,13 +55,24 @@ class model():
         self.key_label = key_label
         self.key_embd_index = key_embd_index
         self.key_var_genename = key_var_genename
+        self.key_uns = key_uns
         self.n_genes = adata.shape[1]
         self.embd_tensor = torch.tensor(embd.values, dtype=torch.float32)
         self.network = None
+        self.nonzero_idx_dict = self.adata.uns['non_zeros_gene_idx']
         self.loss_history = {
             'train_loss': [],
             'val_loss': []
         }
+        # Determine the device
+        if device == 'auto':
+            if torch.cuda.is_available():
+                current_device = torch.cuda.current_device()
+                self.device = torch.device("cuda:" + str(current_device))
+            else:
+                self.device = torch.device('cpu')
+        else:
+            self.device = torch.device(device)
         
         
     def train(self, 
@@ -65,7 +86,7 @@ class model():
               use_layer_norm=False,
               dropout_rate=0.,
               loss_gamma=2.0,
-              loss_lambda_=0.1,
+              loss_lambda=0.1,
               lr=0.005,
               sched_gamma=0.8,
               n_epochs=40,
@@ -84,7 +105,7 @@ class model():
                                         n_hidden_generator=n_hidden_generator,
                                         use_batch_norm=use_batch_norm, 
                                         use_layer_norm=use_layer_norm,
-                                        dropout_rate=dropout_rate)
+                                        dropout_rate=dropout_rate).to(self.device)
         
         optimizer = optim.Adam(network.parameters(), lr=lr)
         scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=sched_gamma)
@@ -98,10 +119,14 @@ class model():
             network.train()
             train_loss = 0.0
             train_progress = tqdm(train_loader, desc=f"Epoch {epoch+1}/{n_epochs} - Training Batches", leave=True, unit="batch")
-            for ctrl_exp, pert_expr, gene_idx, bcode in train_progress:
+            for ctrl_expr, true_expr, pert_idx, bcode in train_progress:
+                ctrl_expr, true_expr, pert_idx = ctrl_expr.to(self.device), true_expr.to(self.device), pert_idx.to(self.device)
+                group = train_adata[bcode,:].obs[self.key_uns].values.tolist()
                 optimizer.zero_grad()
-                output = network(gene_idx, ctrl_exp)
-                loss = gears_loss(output, pert_expr, ctrl_exp, gene_idx, gamma=loss_gamma, lambda_=loss_lambda_)
+                pred_expr = network(pert_idx, ctrl_expr)
+                loss = gears_loss(pred_expr, true_expr, ctrl_expr, group, 
+                                  nonzero_idx_dict=self.nonzero_idx_dict, 
+                                  gamma=loss_gamma, lambda_=loss_lambda)
                 loss.backward()
                 nn.utils.clip_grad_norm_(network.parameters(), max_norm=1.0)
                 optimizer.step()
@@ -115,9 +140,10 @@ class model():
                 val_loss = 0.0
                 val_progress = tqdm(val_loader, desc=f"Epoch {epoch+1}/{n_epochs} - Validation Batches", leave=True, unit="batch")
                 with torch.no_grad():
-                    for ctrl_exp, pert_expr, gene_idx, bcode in val_progress:
-                        output = network(gene_idx, ctrl_exp)
-                        loss = gears_loss(output, pert_expr, ctrl_exp, gene_idx, gamma=loss_gamma, lambda_=loss_lambda_)
+                    for ctrl_expr, true_expr, pert_idx, bcode in val_progress:
+                        ctrl_expr, true_expr, pert_idx = ctrl_expr.to(self.device), true_expr.to(self.device), pert_idx.to(self.device)
+                        pred_expr = network(pert_idx, ctrl_expr)
+                        loss = gears_loss(pred_expr, true_expr, ctrl_expr, pert_idx, gamma=loss_gamma, lambda_=loss_lambda)
                         val_loss += loss.item()
                 val_loss /= len(val_loader)
     
@@ -159,17 +185,19 @@ class model():
         pred_adata = input_adata.copy()
         pred_dataset = BalancedDataset(pred_adata, key_label=self.key_label, key_embd_index=self.key_embd_index)
         pred_loader = DataLoader(pred_dataset, batch_size=len(pred_dataset), shuffle=False)
-        ctrl_exp, pert_expr, gene_idx, bcode = next(iter(pred_loader))
+        ctrl_expr, true_expr, pert_idx, bcode = next(iter(pred_loader))
         
         # Inference
-        prediction = self.network(gene_idx, ctrl_exp).detach()
+        self.network.eval()
+        with torch.no_grad():
+            ctrl_expr, true_expr, pert_idx = ctrl_expr.to(self.device), true_expr.to(self.device), pert_idx.to(self.device)
+            prediction = self.network(pert_idx, ctrl_expr).cpu()  # Move prediction back to CPU
         pred_adata = pred_adata[bcode,:]
         pred_adata.X = prediction
         
         # Loss
-        # test_loss = gears_loss(prediction, pert_expr, ctrl_exp, gene_idx, gamma=loss_gamma, lambda_=loss_lambda_).item()
+        # test_loss = gears_loss(prediction, true_expr, ctrl_expr, pert_idx, gamma=loss_gamma, lambda_=loss_lambda).item()
 
-        # return pred_adata, test_loss
         return pred_adata
     
     def barplot(self, condition, pred_adata, true_adata, key_condition='condition_name', degs_key='top_non_dropout_de_20'):

@@ -3,7 +3,7 @@ import torch
 import anndata as ad
 import pandas as pd
 import numpy as np
-from _utils import *
+from _utils import setup_ad, split_TrainVal
 import random
 from api import model
 
@@ -17,8 +17,8 @@ def set_seeds(seed=42):
 # Set seeds for reproducibility
 set_seeds(42)
 
-data_path = '/Users/pancake/Downloads/PerturbGPT/PerturbData/adamson/perturb_processed.h5ad'
-embd_path = '/Users/pancake/Downloads/PerturbGPT/PerturbData/GeneEmb/GenePT_emb/GenePT_gene_embedding_ada_text.pickle'
+data_path = '/Users/pancake/Downloads/PerturbData/adamson/perturb_processed.h5ad'
+embd_path = '/Users/pancake/Downloads/PerturbData/GeneEmb/GenePT_emb/GenePT_gene_embedding_ada_text.pickle'
 
 # Load the processed scRNA-seq dataset as Anndata
 adata = ad.read_h5ad(data_path)
@@ -38,18 +38,20 @@ subsets
 
 i = 0
 metric_list = []
-for ss in subsets[10:]:
+for ss in subsets:
     i += 1
-    print(f'{i+1}/{len(subsets[10:])}')
+    print(f'{i}/{len(subsets[10:])}')
     train_adata, test_adata = split_TrainVal(adata, key_label='condition', val_conds_include=ss)
     # Initialize the model
     mymodel = model(adata = train_adata, 
                     embd = embd, 
                     key_label='condition',
                     key_embd_index = 'embd_index',
-                    key_var_genename = 'gene_name')
+                    key_var_genename = 'gene_name',
+                    key_uns = 'condition_name',
+                    device='mps')
     # Train the model
-    mymodel.train(val_ratio=0., n_epochs=4)
+    mymodel.train(val_ratio=0., n_epochs=20)
     # Predict on test data
     pred_adata = mymodel.pred(test_adata)
     # Make barplot of a given gene
@@ -59,4 +61,4 @@ for ss in subsets[10:]:
     metric_list.append(metric_df)
     
 metric_df = pd.concat(metric_list)
-metric_df.to_csv('Result/metric_adamson.csv')
+metric_df.to_csv('Result/metric_adamson_own.csv')

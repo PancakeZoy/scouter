@@ -50,8 +50,8 @@ class GenePerturbationModel(nn.Module):
                                          use_layer_norm, 
                                          dropout_rate)
 
-    def forward(self, gene_idx, ctrl_exp):
-        input_gene = self.embd[gene_idx].sum(axis=1)
+    def forward(self, pert_idx, ctrl_exp):
+        input_gene = self.embd[pert_idx].sum(axis=1)
         input_ctrl = self.encoder(ctrl_exp)
         concatenated_input = torch.cat((input_gene, input_ctrl), dim=-1)
         output = self.generator(concatenated_input)

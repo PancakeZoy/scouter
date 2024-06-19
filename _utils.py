@@ -4,27 +4,30 @@ import anndata as ad
 import pandas as pd
 import scanpy as sc
 
-def gears_loss(predicted, true, control, group, gamma, lambda_):
-    def group_mean(expr, group):
-        unique_ids, inverse_indices = torch.unique(group, return_inverse=True, dim=0)
-        num_groups = unique_ids.size(0)
-        group_sums = torch.zeros(num_groups)
-        group_sums.index_add_(0, inverse_indices, expr)
-        group_counts = torch.zeros(num_groups).index_add_(0, inverse_indices, torch.ones(group.shape[0]))
-        group_means = group_sums / group_counts
-        return group_means
+def gears_loss(pred_expr, true_expr, ctrl_expr, group, 
+               nonzero_idx_dict, gamma, lambda_):
 
-    # Autofocus loss calculation
-    DiffExpr_CellAvg = ((true - predicted).abs() ** (2 + gamma)).mean(axis=1)
-    autofocus_loss = group_mean(DiffExpr_CellAvg, group).mean()
+    unique_cond, idx = np.unique(group, return_inverse=True)
+    idx_dict = {val: [] for val in unique_cond}
+    for i, cond in enumerate(idx):
+        idx_dict[unique_cond[cond]].append(i)
     
-    # Direction-aware loss calculation    
-    DiffSign_CellAvg = ((torch.sign(true - control) - torch.sign(predicted - control))**2).mean(axis=1)
-    direction_aware_loss = group_mean(DiffSign_CellAvg, group).mean()
-
-    # Total loss
-    total_loss = autofocus_loss + lambda_ * direction_aware_loss
-    return total_loss
+    total_loss = torch.tensor(0.0, device=pred_expr.device)
+    for p in set(group):
+        cell_idx = idx_dict[p]
+        retain_gene_idx = list(nonzero_idx_dict[p])
+        
+        p_pred = pred_expr[cell_idx][:,retain_gene_idx]
+        p_true = true_expr[cell_idx][:,retain_gene_idx]
+        p_ctrl = ctrl_expr[cell_idx][:,retain_gene_idx]
+        # Autofocus loss calculation
+        autofocus_loss = ((p_true - p_pred).abs() ** (2 + gamma)).mean()
+        # Direction-aware loss calculation
+        direction_aware_loss = ((torch.sign(p_true - p_ctrl) - torch.sign(p_pred - p_ctrl))**2).mean()
+        # Total loss
+        total_loss += (autofocus_loss + lambda_ * direction_aware_loss)
+    
+    return total_loss/(len(set(group)))
 
 
 def split_TrainValTest(adata, key_label, test_conds_include=None, val_test_ratio=[0.1,0.1]):
@@ -34,31 +37,6 @@ def split_TrainValTest(adata, key_label, test_conds_include=None, val_test_ratio
     
     return train_adata, val_adata, test_adata
 
-
-# def split_TrainVal(adata, key_label, val_conds_include=None, val_ratio=0.2):
-#     """Splits the data into train, validation based on conditions."""
-#     all_conds = adata[adata.obs[key_label] != 'ctrl'].obs[key_label].unique().tolist()
-#     np.random.shuffle(all_conds)
-#     n_ValNeed = round(val_ratio * len(all_conds))
-#     if val_conds_include is None:
-#         val_conds, train_conds = np.split(all_conds, [n_ValNeed])
-#         train_conds = list(train_conds)+['ctrl']
-#         val_conds = list(val_conds)+['ctrl']
-#     else:
-#         n_given = len(val_conds_include)
-#         if n_given > n_ValNeed:
-#             raise ValueError(f"Number of given validation conditions must be smaller than or equal to {n_ValNeed}.")
-#         rest_of_conds = list(set(all_conds) - set(val_conds_include))
-#         val_conds, train_conds = np.split(rest_of_conds, [(n_ValNeed-n_given)])
-#         train_conds = list(train_conds)+['ctrl']
-#         val_conds = list(val_conds)+val_conds_include+['ctrl']
-
-#     train_mask = adata.obs['condition'].isin(train_conds)
-#     val_mask = adata.obs['condition'].isin(val_conds)
-#     train_adata = adata[train_mask]
-#     val_adata = adata[val_mask]
-
-#     return train_adata, val_adata
 
 def split_TrainVal(adata, key_label, val_conds_include=None, val_ratio=0.2, seed=42):
     """Splits the data into train, validation based on conditions."""
@@ -109,10 +87,7 @@ def setup_ad(adata: ad.AnnData,
         New column name to be added to adata.obs that will store the index of the perturbed gene in the gene embedding matrix.
     """
     adata = adata.copy(); embd=embd.copy()
-    
-    # Normalize the condition name. Make "A+B" and "B+A" the same
-    adata.obs[key_label] = adata.obs[key_label].astype(str).apply(lambda x: '+'.join(sorted(x.split('+'))))
-    adata.obs[key_label] = adata.obs[key_label].astype('category')
+
     # Find the matched genes between embd and adata
     gene_name_ad = adata.var[key_Gname].tolist()
     gene_name_embd = embd.index.tolist()
