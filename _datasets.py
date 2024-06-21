@@ -23,15 +23,15 @@ class BalancedDataset(Dataset):
             Whether to shuffle control cells and perturbed cells. Default is to True.
         """
         
-        self.ctrl_exp = adata[adata.obs[key_label] == 'ctrl'].X.toarray()
+        self.ctrl_expr = adata[adata.obs[key_label] == 'ctrl'].X.toarray()
 
         self.pert_adata = adata[adata.obs[key_label] != 'ctrl']
-        self.true_exp = self.pert_adata.X.toarray()
+        self.true_expr = self.pert_adata.X.toarray()
         self.pert_idx = self.pert_adata.obs[key_embd_index].values
         self.conditions = self.pert_adata.obs[key_label].values
         self.bcode = self.pert_adata.obs.index.tolist()
         
-        self.PertCellIndx = np.arange(len(self.true_exp))
+        self.PertCellIndx = np.arange(len(self.true_expr))
         self.CtrlCellIndx = self._GetCtrlIndx(len(self.PertCellIndx))
         
         if shuffle:
@@ -45,14 +45,14 @@ class BalancedDataset(Dataset):
         return len(self.PertCellIndx)
     
     def __getitem__(self, idx):
-        ctrl_exp = torch.tensor(self.ctrl_exp[self.CtrlCellIndx[idx]], dtype=torch.float32)
-        true_exp = torch.tensor(self.true_exp[self.PertCellIndx[idx]], dtype=torch.float32)
+        ctrl_expr = torch.tensor(self.ctrl_expr[self.CtrlCellIndx[idx]], dtype=torch.float32)
+        true_expr = torch.tensor(self.true_expr[self.PertCellIndx[idx]], dtype=torch.float32)
         pert_idx = torch.tensor(self.pert_idx[self.PertCellIndx[idx]], dtype=torch.long)
         bcode = self.bcode[self.PertCellIndx[idx]]
-        return ctrl_exp, true_exp, pert_idx, bcode
+        return ctrl_expr, true_expr, pert_idx, bcode
         
     def _GetCtrlIndx(self, num_samples):
-        num_control_cells = len(self.ctrl_exp)
+        num_control_cells = len(self.ctrl_expr)
         indices = np.arange(num_control_cells)
         sampled_indices = np.resize(indices, num_samples)
         return sampled_indices

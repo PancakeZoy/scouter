@@ -125,7 +125,7 @@ class model():
                 optimizer.zero_grad()
                 pred_expr = network(pert_idx, ctrl_expr)
                 loss = gears_loss(pred_expr, true_expr, ctrl_expr, group, 
-                                  nonzero_idx_dict=self.nonzero_idx_dict, 
+                                  nonzero_idx_dict=self.nonzero_idx_dict,
                                   gamma=loss_gamma, lambda_=loss_lambda)
                 loss.backward()
                 nn.utils.clip_grad_norm_(network.parameters(), max_norm=1.0)
@@ -143,7 +143,9 @@ class model():
                     for ctrl_expr, true_expr, pert_idx, bcode in val_progress:
                         ctrl_expr, true_expr, pert_idx = ctrl_expr.to(self.device), true_expr.to(self.device), pert_idx.to(self.device)
                         pred_expr = network(pert_idx, ctrl_expr)
-                        loss = gears_loss(pred_expr, true_expr, ctrl_expr, pert_idx, gamma=loss_gamma, lambda_=loss_lambda)
+                        loss = gears_loss(pred_expr, true_expr, ctrl_expr, group, 
+                                          nonzero_idx_dict=self.nonzero_idx_dict,
+                                          gamma=loss_gamma, lambda_=loss_lambda)
                         val_loss += loss.item()
                 val_loss /= len(val_loader)
     
@@ -160,7 +162,8 @@ class model():
     
             # Early stopping logic
             if val_loss is not None:
-                if val_loss < best_val_loss:
+                improvement = best_val_loss - val_loss
+                if improvement > 0.001:  # Check if the improvement is greater than 0.001
                     best_val_loss = val_loss
                     epochs_no_improve = 0
                     best_model_state_dict = network.state_dict()

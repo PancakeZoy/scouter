@@ -42,7 +42,7 @@ def split_TrainVal(adata, key_label, val_conds_include=None, val_ratio=0.2, seed
     """Splits the data into train, validation based on conditions."""
     all_conds = adata[adata.obs[key_label] != 'ctrl'].obs[key_label].unique().tolist()
     if val_conds_include is None:
-        np.random.seed(42)
+        np.random.seed(seed)
         np.random.shuffle(all_conds)
         n_ValNeed = round(val_ratio * len(all_conds))        
         val_conds, train_conds = np.split(all_conds, [n_ValNeed])
