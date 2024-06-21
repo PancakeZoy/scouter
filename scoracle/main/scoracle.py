@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error as mse
 from scipy.stats import pearsonr, spearmanr
 
-class model():
+class scOracle():
     def __init__(
         self,
         adata,
