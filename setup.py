@@ -16,7 +16,7 @@ setup(
 		'scanpy',
 		'seaborn',
 		'matplotlib',
-		'sklearn',
+		'scikit-learn',
 		'scipy'
 	]
 )
