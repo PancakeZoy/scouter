@@ -3,6 +3,8 @@ import anndata as ad
 import pandas as pd
 import scanpy as sc
 from ._utils import split_TrainVal
+import warnings
+from pandas.errors import PerformanceWarning
 
 class OracleData():
     """
@@ -68,8 +70,9 @@ class OracleData():
 
 
     def setup_ad(self,
-                 key_embd_index: str='embd_index'):
-
+                 key_embd_index: str='embd_index',
+                 slim: bool = True):
+    
         """
         Setup `adata` and `embd`.
         `embd` will be filtered so that it only contains the matched genes.
@@ -80,36 +83,51 @@ class OracleData():
         ----------
         key_embd_index:
             The column name of `adata.obs` that corresponds to gene index in embedding matrix.
+        slim:
+            Whether to filter the embedding matrix to only contain perturbed genes. 
+            Please set it as False for real case prediction.
+            Default is True.
         """
         self.key_embd_index = key_embd_index
-        # Find the matched genes between embd and adata, slim embedding matrix to only contain matched genes
-        gene_name_ad = self.adata.var[self.key_var_genename].tolist()
+    
+        # Three different type of gene names: 1. genes in embd; 2. genes perturbed
         gene_name_embd = self.embd.index.tolist()
-        matched_genes = ['ctrl'] + sorted(list(np.intersect1d(gene_name_embd, gene_name_ad)))
-        self.embd = self.embd.loc[matched_genes]
-        print(f'{len(matched_genes)} matched genes found between your dataset and gene embedding')
-
-        # Detect any perturbed genes that are not in matched genes
         uniq_conds = self.adata.obs[self.key_label].unique().tolist()
         if 'ctrl' not in uniq_conds:
             raise TypeError("Provided annData does not have control cells")
-        perturb_genes = np.unique(sum([p.split('+') for p in uniq_conds], []))
-        unmatched_genes = perturb_genes[[p not in matched_genes for p in perturb_genes]]
+        gene_name_pert = np.unique(sum([p.split('+') for p in uniq_conds], []))
+    
+        # Find the matched genes between 1 and 2. 
+        matched_genes = sorted(list(np.intersect1d(gene_name_embd, gene_name_pert)))
+        if 'ctrl' not in matched_genes:
+            raise TypeError(f"Ctrl condition not found in gene embedding or '{self.key_label}' column of adata.obs")
+        
+        # slim embedding matrix to only contain matched genes if 'slim' is True
+        if slim:
+            self.embd = self.embd.loc[matched_genes]
+        
+        # Detect cells with perturbed genes not in matched genes
+        unmatched_genes = gene_name_pert[[p not in matched_genes for p in gene_name_pert]]
         if len(unmatched_genes) > 0:
-            print(f'{len(unmatched_genes)} perturbed genes are not found in the gene embedding matrix: {unmatched_genes}. \nHence they are deleted.\nPlease check if this is because of different gene synonyms. ')
+            print(f'{len(unmatched_genes)} perturbed genes are not found in the gene embedding matrix: \n{unmatched_genes}. \nHence they are deleted. Please check if this is because of different gene synonyms. ')
             # Filter the DataFrame by excluding rows where the condition contains unmatched genes
-            self.adata = self.adata[~self.adata.obs[self.key_label].str.contains('|'.join(unmatched_genes))]
-            # self.adata = self.adata[~self.adata.obs[self.key_label].apply(lambda condition: any(gene in condition for gene in unmatched_genes))].copy()            
+            delete = self.adata.obs[self.key_label].str.split('+').apply(lambda x: any(i in unmatched_genes for i in x))
+            print(f'Please check if the deletion of following conditions are correct: \n{sorted(list(self.adata[delete].obs[self.key_label].unique()))}')
+            self.adata = self.adata[~delete].copy()
             uniq_conds = self.adata.obs[self.key_label].unique().tolist()
-            perturb_genes = np.unique(sum([p.split('+') for p in uniq_conds], []))
+            gene_name_pert = np.unique(sum([p.split('+') for p in uniq_conds], []))
         else:
-            print('All perturbed genes are found in the gene embedding matrix!')
+            print(f'All {len(gene_name_pert)} perturbed genes are found in the gene embedding matrix!')
             
         #Create a new column that contains the index of perturbed genes in embd matrix
-        gene_ind_dic = {g: matched_genes.index(g) for g in perturb_genes}
+        embd_names = self.embd.index.tolist()
+        gene_ind_dic = {g: embd_names.index(g) for g in gene_name_pert}
         cond_ind_dic = {cond:[gene_ind_dic[gene] for gene in cond.split('+')] for cond in uniq_conds}
+        if self.adata.is_view:
+            self.adata = self.adata.copy()
         self.adata.obs[key_embd_index] = self.adata.obs[self.key_label].astype(str).map(cond_ind_dic)
         self.matched_genes = matched_genes
+        self.unmatched_genes = unmatched_genes
 
     def split_Train_Val_Test(
             self, 
@@ -160,13 +178,17 @@ class OracleData():
         """
         
         gene_dict = {}
-        sc.tl.rank_genes_groups(
-            self.adata,
-            groupby=self.key_label,
-            reference='ctrl',
-            rankby_abs=rankby_abs,
-            n_genes=len(self.adata.var),
-            **kwargs)
+        # Suppress PerformanceWarning warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter(action='ignore', category=PerformanceWarning)
+            sc.tl.rank_genes_groups(
+                self.adata,
+                groupby=self.key_label,
+                reference='ctrl',
+                rankby_abs=rankby_abs,
+                n_genes=len(self.adata.var),
+                **kwargs
+            )
         de_genes = pd.DataFrame(self.adata.uns['rank_genes_groups']['names'])
         for group in de_genes:
             gene_dict[group] = de_genes[group].tolist()
