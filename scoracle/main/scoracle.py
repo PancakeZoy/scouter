@@ -118,8 +118,8 @@ class scOracle():
         nonzero_idx_dict = self.train_adata.uns[nonzero_idx_key]
         train_dataset = BalancedDataset(self.train_adata, key_label=self.key_label, key_embd_index=self.key_embd_index)
         val_dataset = BalancedDataset(self.val_adata, key_label=self.key_label, key_embd_index=self.key_embd_index)
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, drop_last=True)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size, drop_last=True) if len(val_dataset) > 0 else None
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, drop_last=True, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, drop_last=False) if len(val_dataset) > 0 else None
         
         optimizer = optim.Adam(self.network.parameters(), lr=lr)
         scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=sched_gamma)
