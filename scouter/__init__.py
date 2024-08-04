@@ -1,2 +1,2 @@
-from .main.Scouter import Scouter
-from .main.ScouterData import ScouterData
+from .Scouter import Scouter
+from .ScouterData import ScouterData
