@@ -6,3 +6,5 @@ scouter-info/
 dist
 build
 MANIFEST.in
+.DS_Store
+demo/.DS_Store
