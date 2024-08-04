@@ -1,9 +1,15 @@
 from setuptools import setup, find_packages
+import pathlib
+
+HERE = pathlib.Path(__file__).parent
+README = (HERE / "README.md").read_text()
 
 setup(
-	name='scouter',
-	version='0.1.0',
+	name='scouter-learn',
+	version='0.1.2',
 	description='A transcriptional response predictor for unseen genetic perturbtions with LLM embeddings',
+    long_description=README,
+    long_description_content_type='text/markdown',
 	packages=find_packages(include=['scouter', 'scouter.*']),
 	author='Ouyang Zhu, Jun Li',
 	author_email='ozhu@nd.edu',

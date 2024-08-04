@@ -1,5 +1,5 @@
 <p align="left">
-  <img src="img/ScouterLogo.png" width="100" title="logo">
+  <img src="https://github.com/PancakeZoy/scouter/blob/master/img/ScouterLogo.png?raw=true" width="100" title="logo">
 </p>
 
 # Scouter: a transcriptional response predictor for unseen genetic perturbtions with LLM embeddings
@@ -10,15 +10,15 @@ Scouter employs the LLM embeddings generated from text description of genes, ena
 
 For more details read our [manuscript]()
 <p align="center">
-  <img src="img/workflow_horizontal.png" width="750" title="logo">
+  <img src="https://github.com/PancakeZoy/scouter/blob/master/img/workflow_horizontal.png?raw=true" width="750" title="logo">
 </p>
 <br><br><br>
 <p align="center">
-  <img src="img/scouter_horizontal.png" width="750" title="logo">
+  <img src="https://github.com/PancakeZoy/scouter/blob/master/img/scouter_horizontal.png?raw=true" width="750" title="logo">
 </p>
 
 ## Installation
-`pip install scouter`
+`pip install scouter-learn`
 
 ## Main API
 Below is an example that includes main APIs to train `Scouter` on a perturbation dataset. 
