@@ -4,9 +4,16 @@ import pathlib
 HERE = pathlib.Path(__file__).parent
 README = (HERE / "README.md").read_text()
 
+# Read the version from scouter/_version.py
+def read_version():
+    version_dict = {}
+    with open(HERE / "scouter" / "_version.py") as version_file:
+        exec(version_file.read(), version_dict)
+    return version_dict['__version__']
+
 setup(
 	name='scouter-learn',
-	version='0.1.2',
+	version=read_version(),
 	description='A transcriptional response predictor for unseen genetic perturbtions with LLM embeddings',
     long_description=README,
     long_description_content_type='text/markdown',
