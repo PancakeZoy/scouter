@@ -1,7 +1,7 @@
 from ._utils import gears_loss
 from ._model import GenePerturbationModel
 from ._datasets import BalancedDataset
-from .OracleData import OracleData
+from .ScouterData import ScouterData
 import pandas as pd
 import numpy as np
 from torch.utils.data import DataLoader
@@ -14,9 +14,9 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error as mse
 from scipy.stats import pearsonr, spearmanr
 
-class scOracle():
+class Scouter():
     """
-    scOracle model class
+    Scouter model class
     
     Attributes
     ----------
@@ -44,20 +44,20 @@ class scOracle():
     
     def __init__(
         self,
-        pertdata: OracleData,
+        pertdata: ScouterData,
         device: str='auto'
     ):
         """
         Parameters
         ----------
         - pertdata:
-            An OracleData Object containing cell expression anndata and gene embedding matrix
+            An ScouterData Object containing cell expression anndata and gene embedding matrix
         - device:
             Device to run the model on. Default: 'auto'
         """
 
-        if not isinstance(pertdata, OracleData):
-            raise TypeError("`pertdata` must be an OracleData object")
+        if not isinstance(pertdata, ScouterData):
+            raise TypeError("`pertdata` must be an ScouterData object")
         
         self.embd_idx_dict = {gene:i for i, gene in enumerate(pertdata.embd.index)}
         self.embd_tensor = torch.tensor(pertdata.embd.values, dtype=torch.float32)

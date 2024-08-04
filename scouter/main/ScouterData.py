@@ -6,7 +6,7 @@ from ._utils import split_TrainVal
 import warnings
 from pandas.errors import PerformanceWarning
 
-class OracleData():
+class ScouterData():
     """
     Class for loading and processing perturbation data
 
@@ -131,6 +131,7 @@ class OracleData():
 
     def split_Train_Val_Test(
             self, 
+            val_conds = None,
             val_ratio=0.1,
             if_test = True,
             test_conds=None,
@@ -141,6 +142,8 @@ class OracleData():
         
         Parameters
         ----------
+        val_conds : list or None, optional
+            List of perturbation conditions to be the val set. If None, conditions are selected randomly based on `val_ratio`. Default is None.        
         val_ratio: float
             The proportion of the validation split compared to train split. Default is 0.1.
         if_test: boolean
@@ -158,10 +161,10 @@ class OracleData():
             _, train_val_adata, self.test_conds, self.test_adata = \
                 split_TrainVal(self.adata, self.key_label, val_conds_include=test_conds, val_ratio=test_ratio, seed=seed)
             self.train_conds, self.train_adata, self.val_conds, self.val_adata = \
-                split_TrainVal(train_val_adata, self.key_label, val_conds_include=None, val_ratio=val_ratio, seed=seed)
+                split_TrainVal(train_val_adata, self.key_label, val_conds_include=val_conds, val_ratio=val_ratio, seed=seed)
         else:
             self.train_conds, self.train_adata, self.val_conds, self.val_adata = \
-                split_TrainVal(self.adata, self.key_label, val_conds_include=None, val_ratio=val_ratio, seed=seed)
+                split_TrainVal(self.adata, self.key_label, val_conds_include=val_conds, val_ratio=val_ratio, seed=seed)
 
     def gene_ranks(self, rankby_abs=True, **kwargs):
         """
