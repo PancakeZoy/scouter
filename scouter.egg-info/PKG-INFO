@@ -1,0 +1,17 @@
+Metadata-Version: 2.1
+Name: scouter
+Version: 0.1
+Summary: Gene Perturbation Prediction with LLM
+Home-page: https://github.com/PancakeZoy/scouter
+Author: Ouyang Zhu, Jun Li
+Author-email: ozhu@nd.edu
+Requires-Dist: torch>=2.0.0
+Requires-Dist: tqdm
+Requires-Dist: anndata
+Requires-Dist: pandas
+Requires-Dist: numpy
+Requires-Dist: scanpy
+Requires-Dist: seaborn
+Requires-Dist: matplotlib
+Requires-Dist: scikit-learn
+Requires-Dist: scipy

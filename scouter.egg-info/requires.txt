@@ -1,0 +1,10 @@
+torch>=2.0.0
+tqdm
+anndata
+pandas
+numpy
+scanpy
+seaborn
+matplotlib
+scikit-learn
+scipy
