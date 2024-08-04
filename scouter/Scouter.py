@@ -108,7 +108,7 @@ class Scouter():
               loss_gamma=2.0,
               loss_lambda=0.1,
               lr=0.005,
-              sched_gamma=0.8,
+              sched_gamma=0.9,
               n_epochs=40,
               patience=5):
         """
