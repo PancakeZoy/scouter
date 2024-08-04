@@ -86,7 +86,7 @@ class Scouter():
     def model_init(self,
                    n_hidden_encoder=(2048, 512),
                    n_out_encoder=64,
-                   n_hidden_generator=(2048, 3072),
+                   n_hidden_generator=(2048,),
                    use_batch_norm=True,
                    use_layer_norm=False,
                    dropout_rate=0.):
@@ -104,10 +104,10 @@ class Scouter():
 
     def train(self,
               nonzero_idx_key='gene_idx_non_zeros',
-              batch_size=128,
-              loss_gamma=2.0,
-              loss_lambda=0.1,
-              lr=0.005,
+              batch_size=256,
+              loss_gamma=0.,
+              loss_lambda=0.5,
+              lr=0.001,
               sched_gamma=0.9,
               n_epochs=40,
               patience=5):
