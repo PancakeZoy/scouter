@@ -1,5 +1,5 @@
 from ._utils import gears_loss
-from ._model import GenePerturbationModel
+from ._model import ScouterModel
 from ._datasets import BalancedDataset
 from .ScouterData import ScouterData
 import pandas as pd
@@ -17,6 +17,13 @@ from scipy.stats import pearsonr, spearmanr
 class Scouter():
     """
     Scouter model class
+    
+    Parameters
+    ----------
+    - pertdata:
+        An ScouterData Object containing cell expression anndata and gene embedding matrix
+    - device:
+        Device to run the model on. Default: 'auto'
     
     Attributes
     ----------
@@ -36,7 +43,7 @@ class Scouter():
         The column name of `adata.obs` that corresponds to gene index in embedding matrix.
     n_genes: int
         Number of genes in the cell expression 
-    network: GenePerturbationModel
+    network: ScouterModel
         The model achieves minimal validation loss after training
     loss_history: dict
         Dictionary containing the loss history on both train split and validation split
@@ -47,14 +54,6 @@ class Scouter():
         pertdata: ScouterData,
         device: str='auto'
     ):
-        """
-        Parameters
-        ----------
-        - pertdata:
-            An ScouterData Object containing cell expression anndata and gene embedding matrix
-        - device:
-            Device to run the model on. Default: 'auto'
-        """
 
         if not isinstance(pertdata, ScouterData):
             raise TypeError("`pertdata` must be an ScouterData object")
@@ -84,17 +83,17 @@ class Scouter():
 
 
     def model_init(self,
-                   n_hidden_encoder=(2048, 512),
+                   n_encoder=(2048, 512),
                    n_out_encoder=64,
-                   n_hidden_generator=(2048,),
+                   n_decoder=(2048,),
                    use_batch_norm=True,
                    use_layer_norm=False,
                    dropout_rate=0.):
-        self.network = GenePerturbationModel(self.n_genes, 
+        self.network = ScouterModel(self.n_genes, 
                                              self.embd_tensor,
-                                             n_hidden_encoder=n_hidden_encoder, 
+                                             n_encoder=n_encoder, 
                                              n_out_encoder=n_out_encoder, 
-                                             n_hidden_generator=n_hidden_generator,
+                                             n_decoder=n_decoder,
                                              use_batch_norm=use_batch_norm, 
                                              use_layer_norm=use_layer_norm,
                                              dropout_rate=dropout_rate).to(self.device)

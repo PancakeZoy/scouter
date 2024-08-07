@@ -1,50 +1,50 @@
 import torch
 import torch.nn as nn
 
-class GenePerturbationModel(nn.Module):
+class ScouterModel(nn.Module):
     def __init__(self, 
                  n_genes: int, 
                  embd, 
-                 n_hidden_encoder: tuple=(2048, 512), 
-                 n_out_encoder: int=64, 
-                 n_hidden_generator: tuple=(2048, 3072),
-                 use_batch_norm: bool=True, 
-                 use_layer_norm: bool=False,
-                 dropout_rate: float = 0.):
+                 n_encoder: tuple, 
+                 n_out_encoder: int, 
+                 n_decoder: tuple,
+                 use_batch_norm: bool, 
+                 use_layer_norm: bool,
+                 dropout_rate: float):
         
         """
-        Initialize the GenePerturbationModel.
+        Initialize the ScouterModel.
 
         Parameters:
         - n_genes: 
             Number of input genes.
         - embd: 
             Gene embedding matrix.
-        - n_hidden_encoder: 
+        - n_encoder: 
             Tuple specifying the hidden layer sizes for the cell encoder.
         - n_out_encoder: 
             Size of the output layer for the cell encoder.
-        - n_hidden_generator: 
+        - n_decoder: 
             Tuple specifying the hidden layer sizes for the generator.
         - use_batch_norm: 
             Whether to use batch normalization.
         - use_layer_norm: 
             Whether to use layer normalization.
         - dropout_rate: 
-            Dropout rate.
+            Dropout rate.        
         """
         
-        super(GenePerturbationModel, self).__init__()
+        super(ScouterModel, self).__init__()
         self.embd = nn.Parameter(embd.clone().detach(), requires_grad=False)
         n_embd = self.embd.shape[1]
         self.encoder = self._build_mlp(n_genes, 
-                                       n_hidden_encoder, 
+                                       n_encoder, 
                                        n_out_encoder, 
                                        use_batch_norm, 
                                        use_layer_norm, 
                                        dropout_rate)
         self.generator = self._build_mlp(n_out_encoder + n_embd, 
-                                         n_hidden_generator, 
+                                         n_decoder, 
                                          n_genes,
                                          use_batch_norm, 
                                          use_layer_norm, 
