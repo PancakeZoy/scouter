@@ -12,7 +12,7 @@ For more details read our [manuscript]()
 <p align="center">
   <img src="https://github.com/PancakeZoy/scouter/blob/master/img/workflow_horizontal.png?raw=true" width="750" title="logo">
 </p>
-<br><br><br>
+<br>
 <p align="center">
   <img src="https://github.com/PancakeZoy/scouter/blob/master/img/scouter_horizontal.png?raw=true" width="750" title="logo">
 </p>
