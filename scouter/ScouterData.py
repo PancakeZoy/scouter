@@ -36,25 +36,27 @@ class ScouterData():
         List of perturbation conditions in the test split.
     test_adata: anndata.AnnData
         AnnData object for the test split
-    """    
+    """
     def __init__(
         self,
         adata: ad.AnnData,
         embd: pd.DataFrame, 
         key_label: str, 
         key_var_genename: str):
-        """ 
-        Parameters
+        """
+        Initialize the ScouterData object.
+
+        Parameters:
         ----------
-        adata : AnnData
-            Annotated data object. `adata.obs` must contain a column `key_label` with required format: \n
-                 `'ctrl'` for control cells \n
-                 `'geneA+geneB'` or `'geneA+ctrl'` to denote the name of gene(s) perturbed
-        embd : pd.DataFrame
+        adata: anndata.AnnData
+            Annotated data object. `adata.obs` must contain a column `key_label` with required format: 
+                `'ctrl'` for control cells
+                `'geneA+geneB'` or `'geneA+ctrl'` to denote the name of gene(s) perturbed.
+        embd: pandas.DataFrame
             Gene embedding matrix, with gene names as row names.
-        key_label:
-            The column name of `adata.obs` that corresponds to perturbation conditions
-        key_var_genename:
+        key_label: str
+            The column name of `adata.obs` that corresponds to perturbation conditions.
+        key_var_genename: str
             The column name of `adata.var` that corresponds to gene names.
         """
 
@@ -72,21 +74,18 @@ class ScouterData():
     def setup_ad(self,
                  key_embd_index: str='embd_index',
                  slim: bool = True):
-    
         """
         Setup `adata` and `embd`.
-        `embd` will be filtered so that it only contains the matched genes.
+        `embd` will be filtered to only contain the matched genes.
         `adata` will drop the perturbation conditions not covered by matched genes.
         A new column `key_embd_index` will be added to `adata.obs`, denoting the index of perturbed genes in `embd`.
-        
-        Parameters
+
+        Parameters:
         ----------
-        key_embd_index:
-            The column name of `adata.obs` that corresponds to gene index in embedding matrix.
-        slim:
-            Whether to filter the embedding matrix to only contain perturbed genes. 
-            Please set it as False for real case prediction.
-            Default is True.
+        key_embd_index: str, optional
+            The column name of `adata.obs` that corresponds to gene index in the embedding matrix. Default is 'embd_index'.
+        slim: bool, optional
+            Whether to filter the embedding matrix to only contain perturbed genes. Default is True.
         """
         self.key_embd_index = key_embd_index
     
@@ -138,21 +137,21 @@ class ScouterData():
             test_ratio=0.2, 
             seed=24):
         """
-        Splits the annotated data into training, validation and testing sets.
-        
-        Parameters
+        Splits the annotated data into training, validation, and testing sets.
+
+        Parameters:
         ----------
-        val_conds : list or None, optional
-            List of perturbation conditions to be the val set. If None, conditions are selected randomly based on `val_ratio`. Default is None.        
-        val_ratio: float
-            The proportion of the validation split compared to train split. Default is 0.1.
-        if_test: boolean
-            Wheter to generate a split for testing. Default is True.
-        test_conds : list or None, optional
+        val_conds: list or None, optional
+            List of perturbation conditions to be the validation set. If None, conditions are selected randomly based on `val_ratio`. Default is None.
+        val_ratio: float, optional
+            The proportion of the validation split compared to the training split. Default is 0.1.
+        if_test: bool, optional
+            Whether to generate a split for testing. Default is True.
+        test_conds: list or None, optional
             List of perturbation conditions to be the test set. If None, conditions are selected randomly based on `test_ratio`. Default is None.
-        test_ratio : float, optional
+        test_ratio: float, optional
             The proportion of the test split compared to the rest. Default is 0.2.
-        seed : int, optional
+        seed: int, optional
             Random seed for reproducibility. Default is 24.
         """
         self.train_conds, self.train_adata, self.val_conds, self.val_adata, self.test_conds, self.test_adata = \
@@ -168,16 +167,14 @@ class ScouterData():
 
     def gene_ranks(self, rankby_abs=True, **kwargs):
         """
-        Rank genes for each perturbation group. Saved as a dictionary in `adata.uns['rank_genes_groups']`
+        Rank genes for each perturbation group. Saved as a dictionary in `adata.uns['rank_genes_groups']`.
 
-        Parameters
+        Parameters:
         ----------
-        rankby_abs: boolean, optional
-            Rank genes by the absolute value of the score, not by the score. 
-            The returned scores are never the absolute values.
-            Default is True.
-        kwargs
-            All additional keyword arguments passed to the `scanpy.tl.rank_genes_groups` call.
+        rankby_abs: bool, optional
+            Rank genes by the absolute value of the score, not by the score. The returned scores are never the absolute values. Default is True.
+        kwargs: dict, optional
+            All additional keyword arguments are passed to the `scanpy.tl.rank_genes_groups` call.
         """
         
         gene_dict = {}
@@ -206,15 +203,6 @@ class ScouterData():
         `adata.uns['top20_degs_non_dropout']`\n
         `adata.uns['gene_idx_non_dropout']`\n
         `adata.uns['gene_idx_non_zeros']`
-
-        Parameters
-        ----------
-        rankby_abs: boolean, optional
-            Rank genes by the absolute value of the score, not by the score. 
-            The returned scores are never the absolute values.
-            Default is True.
-        kwargs
-            All additional keyword arguments passed to the `scanpy.tl.rank_genes_groups` call.
         """
         
         if 'rank_genes_groups' not in self.adata.uns.keys():

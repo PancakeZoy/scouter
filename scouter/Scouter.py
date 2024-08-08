@@ -17,14 +17,7 @@ from scipy.stats import pearsonr, spearmanr
 class Scouter():
     """
     Scouter model class
-    
-    Parameters
-    ----------
-    - pertdata:
-        An ScouterData Object containing cell expression anndata and gene embedding matrix
-    - device:
-        Device to run the model on. Default: 'auto'
-    
+        
     Attributes
     ----------
     train_adata: anndata.AnnData
@@ -54,6 +47,14 @@ class Scouter():
         pertdata: ScouterData,
         device: str='auto'
     ):
+        """
+        Parameters
+        ----------
+        - pertdata:
+            An ScouterData Object containing cell expression anndata and gene embedding matrix
+        - device:
+            Device to run the model on. Default: 'auto'
+        """
 
         if not isinstance(pertdata, ScouterData):
             raise TypeError("`pertdata` must be an ScouterData object")
@@ -89,14 +90,32 @@ class Scouter():
                    use_batch_norm=True,
                    use_layer_norm=False,
                    dropout_rate=0.):
+        """
+        Initialize the ScouterModel.
+
+        Parameters:
+        ----------
+        - n_encoder: 
+            Tuple specifying the hidden layer sizes for the cell encoder.
+        - n_out_encoder: 
+            Size of the output layer for the cell encoder.
+        - n_decoder: 
+            Tuple specifying the hidden layer sizes for the generator.
+        - use_batch_norm: 
+            Whether to use batch normalization.
+        - use_layer_norm: 
+            Whether to use layer normalization.
+        - dropout_rate: 
+            Dropout rate.
+        """
         self.network = ScouterModel(self.n_genes, 
-                                             self.embd_tensor,
-                                             n_encoder=n_encoder, 
-                                             n_out_encoder=n_out_encoder, 
-                                             n_decoder=n_decoder,
-                                             use_batch_norm=use_batch_norm, 
-                                             use_layer_norm=use_layer_norm,
-                                             dropout_rate=dropout_rate).to(self.device)
+                                    self.embd_tensor,
+                                    n_encoder=n_encoder, 
+                                    n_out_encoder=n_out_encoder, 
+                                    n_decoder=n_decoder,
+                                    use_batch_norm=use_batch_norm, 
+                                    use_layer_norm=use_layer_norm,
+                                    dropout_rate=dropout_rate).to(self.device)
         self.best_val_loss = np.inf
         self.loss_history = {'train_loss': [], 'val_loss': []}
 
@@ -111,8 +130,26 @@ class Scouter():
               n_epochs=40,
               patience=5):
         """
-        -nonzero_idx_key:
-            The key name of 'adata.uns' that contains the index of non-zero genes in each perturbation group (needed for loss calculation)
+        Trains the model with the given parameters.
+    
+        Parameters:
+        ----------            
+        - nonzero_idx_key: 
+            The key name of 'adata.uns' that contains the index of non-zero genes in each perturbation group (needed for loss calculation).
+        - batch_size: 
+            The number of samples per batch. Defaults to 256.
+        - loss_gamma:
+            The γ parameter in the loss function. Defaults to 0.
+        - loss_lambda: 
+            The λ parameter in the loss function. Defaults to 0.5.
+        - lr: 
+            The learning rate for the optimizer. Defaults to 0.001.
+        - sched_gamma: 
+            The multiplicative factor of learning rate decay in ExponentialLR. Defaults to 0.9.
+        - n_epochs: 
+            The maximum number of epochs for training. Defaults to 40.
+        - patience: 
+            Number of epochs with no improvement after which training will be stopped. Defaults to 5.
         """
         nonzero_idx_dict = self.train_adata.uns[nonzero_idx_key]
         train_dataset = BalancedDataset(self.train_adata, key_label=self.key_label, key_embd_index=self.key_embd_index)
@@ -196,6 +233,25 @@ class Scouter():
 
 
     def pred(self, pert_list, n_pred=300, seed=24):
+        """
+        Transcriptional prediction given the list of perturbations.
+    
+        Parameters:
+        ----------
+        - pert_list (list of str):
+            A list of perturbations for prediction
+        - n_pred (int, optional): 
+            Number of control sells to sample, and hence the number of predictions to make for each perturbation. Defaults to 300.
+        - seed (int, optional): 
+            Random seed for reproducibility. Defaults to 24.
+        
+        Returns:
+        ----------
+        - dict:
+            A dictionary where keys are the perturbations and values are arrays predicted transcriptional responses. 
+            Each array contains `n_pred` predicted transcriptional responses for the corresponding perturbation.
+        """       
+        
         np.random.seed(seed)
         # Examine if there is any input gene not in the embedding matrix
         unique_inputs = np.unique(sum([p.split('+') for p in pert_list], []))
@@ -220,6 +276,21 @@ class Scouter():
         return pert_return
     
     def barplot(self, condition, degs_key='top20_degs_non_dropout'):
+        """
+        Generates a bar plot showing the expression of the top 20 differentially expressed genes (DEGs) for a given perturbation condition.
+    
+        Parameters:
+        ----------
+        - condition (str): 
+            The perturbation condition to generate the bar plot for.
+        - degs_key (str, optional): 
+            The key in 'adata.uns' used to retrieve the top 20 DEGs for the specified condition. Defaults to 'top20_degs_non_dropout'.
+    
+        Notes:
+        ----------
+        - If the specified condition is not observed in the dataset, a warning is printed, and the top 20 genes are selected based on the absolute difference between predicted and control expressions.
+        - The function generates a box plot comparing the expression values of the top 20 DEGs among predicted, control, and true groups (if available).
+        """        
         condition_isin = condition in self.all_adata.obs[self.key_label].unique()
         
         pred = self.pred([condition])[condition]
@@ -250,8 +321,28 @@ class Scouter():
         plt.show()
         
         
-    def evaluate(self,  
-                 degs_key='top20_degs_non_dropout'):
+    def evaluate(self, degs_key='top20_degs_non_dropout'):
+        """
+        Evaluates the model's performance on the test dataset using various metrics.
+    
+        Parameters:
+        ----------
+        - degs_key (str, optional): 
+            The key in 'adata.uns' used to retrieve the top 20 differentially expressed genes (DEGs) for each test condition. Defaults to 'top20_degs_non_dropout'.
+    
+        Returns:
+        - pandas.DataFrame:
+            A DataFrame containing the evaluation metrics (Normalized MSE, Pearson correlation, Spearman correlation) for each test condition.
+    
+        Notes:
+        ----------
+        - NormMSE: 
+            Normalized Mean Squared Error (MSE) of the predictions compared to the true values, normalized by the MSE of the control values.
+        - Pearson: 
+            Pearson correlation coefficient between (true-ctrl) and (pred-ctrl) values.
+        - Spearman: 
+            Spearman rank correlation coefficient between (true-ctrl) and (pred-ctrl) values.
+        """        
         metric = {'NormMSE':{}, 'Pearson':{}, 'Spearman':{}}
         test_conds = list(self.test_adata.obs[self.key_label].unique())
         test_conds.remove('ctrl')

@@ -16,6 +16,7 @@ class ScouterModel(nn.Module):
         Initialize the ScouterModel.
 
         Parameters:
+        ----------
         - n_genes: 
             Number of input genes.
         - embd: 
@@ -51,6 +52,15 @@ class ScouterModel(nn.Module):
                                          dropout_rate)
 
     def forward(self, pert_idx, ctrl_exp):
+        """
+        Forward pass of the ScouterModel.
+    
+        Parameters:
+        - pert_idx (torch.Tensor): 
+            Tensor containing the indices of perturbed genes. Shape: (batch_size, num_genes).
+        - ctrl_exp (torch.Tensor): 
+            Tensor containing the control expression values. Shape: (batch_size, num_genes).
+        """        
         input_gene = self.embd[pert_idx].sum(axis=1)
         input_ctrl = self.encoder(ctrl_exp)
         concatenated_input = torch.cat((input_gene, input_ctrl), dim=-1)
@@ -64,6 +74,31 @@ class ScouterModel(nn.Module):
                    use_batch_norm, 
                    use_layer_norm, 
                    dropout_rate):
+        """
+        Builds a multi-layer perceptron (MLP) with the specified configurations.
+    
+        Parameters:
+        - input_dim (int): 
+            The dimension of the input layer.
+        - hidden_dims (tuple of int): 
+            A tuple specifying the size of each hidden layer.
+        - output_dim (int): 
+            The dimension of the output layer.
+        - use_batch_norm (bool): 
+            Whether to use batch normalization after each hidden layer.
+        - use_layer_norm (bool): 
+            Whether to use layer normalization after each hidden layer.
+        - dropout_rate (float): 
+            The dropout rate to use in Alpha Dropout layers. Set to 0.0 to disable dropout.
+    
+        Returns:
+        - nn.Sequential: 
+            A sequential container with the constructed MLP layers.
+    
+        Example:
+        mlp = model._build_mlp(input_dim=128, hidden_dims=(64, 32), output_dim=10, 
+                               use_batch_norm=True, use_layer_norm=False, dropout_rate=0.1)
+        """        
         layers = []
         for h_dim in hidden_dims:
             layers.append(nn.Linear(input_dim, h_dim))
