@@ -33,5 +33,5 @@ setup(
 		'scikit-learn >= 1.5.0',
 		'scipy >= 1.14.0'
 	],
-	python_requires='>=3.11.0'
+	python_requires='>=3.10.0'
 )
