@@ -26,7 +26,8 @@ class BalancedDataset(Dataset):
         seed : int, optional
             Random seed for reproducibility. Default is 24.
         """
-        
+        np.random.seed(seed)
+
         self.ctrl_expr = adata[adata.obs[key_label] == 'ctrl'].X.toarray()
         self.pert_adata = adata[adata.obs[key_label] != 'ctrl']
         self.true_expr = self.pert_adata.X.toarray()
