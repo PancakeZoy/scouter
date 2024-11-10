@@ -31,7 +31,8 @@ setup(
 		'seaborn >= 0.13.0',
 		'matplotlib >= 3.9.0',
 		'scikit-learn >= 1.5.0',
-		'scipy >= 1.14.0'
+		'scipy >= 1.14.0',
+        'requests >= 2.0.0'
 	],
 	python_requires='>=3.10.0'
 )

@@ -165,7 +165,7 @@ class ScouterData():
             self.train_conds, self.train_adata, self.val_conds, self.val_adata = \
                 split_TrainVal(self.adata, self.key_label, val_conds_include=val_conds, val_ratio=val_ratio, seed=seed)
 
-    def gene_ranks(self, rankby_abs=True, **kwargs):
+    def gene_ranks(self, rankby_abs=True, refernce='ctrl', **kwargs):
         """
         Rank genes for each perturbation group. Saved as a dictionary in `adata.uns['rank_genes_groups']`.
 
@@ -173,6 +173,8 @@ class ScouterData():
         ----------
         rankby_abs: bool, optional
             Rank genes by the absolute value of the score, not by the score. The returned scores are never the absolute values. Default is True.
+        reference: str, optional
+            A group identifier, compare with respect to this group. Default is `'ctrl'`.
         kwargs: dict, optional
             All additional keyword arguments are passed to the `scanpy.tl.rank_genes_groups` call.
         """
@@ -184,7 +186,7 @@ class ScouterData():
             sc.tl.rank_genes_groups(
                 self.adata,
                 groupby=self.key_label,
-                reference='ctrl',
+                reference=refernce,
                 rankby_abs=rankby_abs,
                 n_genes=len(self.adata.var),
                 **kwargs
@@ -209,6 +211,7 @@ class ScouterData():
             raise ValueError("Gene expression (ad.AnnData) does not have 'rank_genes_groups' in .uns, please first run function gene_ranks()")
         
         ctrl = np.mean(self.adata[self.adata.obs[self.key_label] == 'ctrl'].X, axis = 0)
+        ctrl = np.array(ctrl).squeeze()
         gene_id2idx = dict(zip(self.adata.var.index.values, range(len(self.adata.var))))
     
         non_zeros_gene_idx = {}
@@ -219,10 +222,11 @@ class ScouterData():
     
         for pert in self.adata.uns['rank_genes_groups'].keys():
             X = np.mean(self.adata[self.adata.obs[self.key_label] == pert].X, axis = 0)
+            X = np.array(X).squeeze()
     
-            non_zero = np.where(np.array(X)[0] != 0)[0]
-            zero = np.where(np.array(X)[0] == 0)[0]
-            true_zeros = np.intersect1d(zero, np.where(np.array(ctrl)[0] == 0)[0])
+            non_zero = np.where(X != 0)[0]
+            zero = np.where(X == 0)[0]
+            true_zeros = np.intersect1d(zero, np.where(ctrl == 0)[0])
             non_dropouts = np.concatenate((non_zero, true_zeros))
     
             rank_genes = self.adata.uns['rank_genes_groups'][pert]
