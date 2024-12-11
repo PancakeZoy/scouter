@@ -8,7 +8,7 @@ Scouter is a deep neural network with simple architecture, for the task of predi
 
 Scouter employs the LLM embeddings generated from text description of genes, enabling the perdiction on unseen genes.
 
-For more details read our [manuscript]().
+For more details read our [manuscript](https://www.biorxiv.org/content/10.1101/2024.12.06.627290v1).
 
 Code for reproducing results: [Link](https://github.com/PancakeZoy/scouter_misc).
 
