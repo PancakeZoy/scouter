@@ -47,8 +47,8 @@ def split_TrainVal(adata, key_label, val_conds_include, val_ratio, seed):
         val_conds = list(val_conds_include)+['ctrl']
         train_conds = list(np.setdiff1d(all_conds, val_conds))+['ctrl']
         
-    train_mask = adata.obs['condition'].isin(train_conds)
-    val_mask = adata.obs['condition'].isin(val_conds)
+    train_mask = adata.obs[key_label].isin(train_conds)
+    val_mask = adata.obs[key_label].isin(val_conds)
     train_adata = adata[train_mask]
     val_adata = adata[val_mask]
 
