@@ -56,3 +56,28 @@ scouter_model.barplot('MANF+ctrl')
 | [Demo.ipynb](demo/Demo.ipynb) | A detailed tutorial on how to apply `Scouter` to a smaller version of Adamson dataset, including preprocessing, paramter setting, model training, and evaluation|
 | [OwnDataTutorial.ipynb](demo/OwnDataTutorial.ipynb)| A tutorial to guide users to load their own dataset and embedding matrix.
 | [UnmatchRemedy.ipynb](demo/UnmatchRemedy.ipynb) | A tutorial that illustrates the problem of unmatched genes between perturbation dataset and embedding matrix, and provides a remedy.|
+
+## Citation
+
+If you use Scouter, please consider citing:
+
+```bibtex
+@article{zhu2026transcouter,
+  title = {A structured study of cross-condition prediction of transcriptional responses to gene perturbations},
+  author = {Zhu, Ouyang and Li, Jun},
+  year = {2026},
+  doi = {10.64898/2026.07.30.741892},
+  journal = {bioRxiv}
+}
+
+@article{zhu2026scouter,
+  title={Scouter predicts transcriptional responses to genetic perturbations with large language model embeddings},
+  author={Zhu, Ouyang and Li, Jun},
+  journal={Nature Computational Science},
+  volume={6},
+  number={1},
+  pages={21--28},
+  year={2026},
+  publisher={Nature Publishing Group US New York}
+}
+```
